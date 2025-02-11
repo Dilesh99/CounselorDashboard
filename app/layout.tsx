@@ -7,8 +7,8 @@ import type React from "react" // Added import for React
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Counselor Dashboard",
-  description: "Professional CRM system for managing student leads",
+  title: "Counselor Dashboard |Mogo media accademy",
+  description: "Professional Enhanced CRM system for managing student leads",
   icons: {
     icon: "/MogoIcon.png",
   },
