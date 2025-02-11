@@ -391,7 +391,7 @@ export default function KanbanBoard() {
 
   return (
     <div className="relative">
-      <div className="mb-4 flex items-center space-x-2">
+      <div className="mb-4 flex items-center space-x-2 ml-16">
         <AddLeadDialog onLeadAdded={handleNewLead} />
         <Popover>
           <PopoverTrigger asChild>
