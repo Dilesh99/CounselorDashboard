@@ -191,9 +191,12 @@ export default function KanbanBoard() {
 
       if (selectedDate) return
 
-      const { source, draggableId, destination } = result
+      const { source, destination, draggableId } = result
 
-      if (!destination) return
+      // If there's no destination, or the item is dropped in the same position, do nothing
+      if (!destination || (source.droppableId === destination.droppableId && source.index === destination.index)) {
+        return
+      }
 
       const correctDestinationId = result.client ? getCorrectDroppableId(result.client.x) : destination.droppableId
 
@@ -204,21 +207,27 @@ export default function KanbanBoard() {
         index: destination.index,
       }
 
-      if (finalDestination.droppableId === source.droppableId && finalDestination.index === source.index) {
-        return
-      }
-
       const sourceColumn = leads[source.droppableId]
       const destColumn = leads[finalDestination.droppableId]
       const draggedLead = sourceColumn[source.index]
 
       if (!sourceColumn || !destColumn || !draggedLead) return
 
+      // Remove the lead from the source column
       const newSourceColumn = Array.from(sourceColumn)
       newSourceColumn.splice(source.index, 1)
 
-      const newDestColumn = Array.from(destColumn)
-      newDestColumn.splice(finalDestination.index, 0, draggedLead)
+      let newDestColumn
+
+      if (source.droppableId === finalDestination.droppableId) {
+        // If moving within the same column, reorder the items
+        newDestColumn = newSourceColumn
+        newDestColumn.splice(finalDestination.index, 0, draggedLead)
+      } else {
+        // If moving to a different column, add to the destination column
+        newDestColumn = Array.from(destColumn)
+        newDestColumn.splice(finalDestination.index, 0, draggedLead)
+      }
 
       const newLeads = {
         ...leads,
@@ -230,20 +239,28 @@ export default function KanbanBoard() {
         ...draggedLead,
         lastModified: new Date().toISOString(),
       }
-      updatedLead.statusHistory.push({ status: finalDestination.droppableId, date: updatedLead.lastModified })
+
+      // Only update status history if the lead has moved to a different column
+      if (source.droppableId !== finalDestination.droppableId) {
+        updatedLead.statusHistory.push({ status: finalDestination.droppableId, date: updatedLead.lastModified })
+      }
+
       newLeads[finalDestination.droppableId][finalDestination.index] = updatedLead
 
       setLeads(newLeads)
 
-      await fetch("/api/leads", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId: draggableId,
-          newStatus: finalDestination.droppableId,
-          lastModified: updatedLead.lastModified,
-        }),
-      })
+      // Only make API call if the lead has moved to a different column
+      if (source.droppableId !== finalDestination.droppableId) {
+        await fetch("/api/leads", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId: draggableId,
+            newStatus: finalDestination.droppableId,
+            lastModified: updatedLead.lastModified,
+          }),
+        })
+      }
     },
     [leads, selectedDate, stopAutoScroll, getCorrectDroppableId],
   )
@@ -259,7 +276,7 @@ export default function KanbanBoard() {
   const handleNewLead = (newLead: any) => {
     setLeads((prevLeads) => ({
       ...prevLeads,
-      new_leads: [newLead, ...prevLeads.new_leads],
+      new_leads: [{ ...newLead, comments: [] }, ...prevLeads.new_leads],
     }))
   }
 
@@ -270,7 +287,9 @@ export default function KanbanBoard() {
         const leadIndex = newLeads[status].findIndex((lead) => lead.id === leadId)
         if (leadIndex !== -1) {
           const updatedLead = { ...newLeads[status][leadIndex] }
-          updatedLead.comments = updatedLead.comments ? [...updatedLead.comments, comment] : [comment]
+          updatedLead.comments = updatedLead.comments || []
+          updatedLead.comments.push(comment)
+          updatedLead.lastModified = new Date().toISOString()
           newLeads[status][leadIndex] = updatedLead
           break
         }
@@ -391,7 +410,7 @@ export default function KanbanBoard() {
 
   return (
     <div className="relative">
-      <div className="mb-4 flex items-center space-x-2 ml-16">
+      <div className="mb-4 flex items-center space-x-2">
         <AddLeadDialog onLeadAdded={handleNewLead} />
         <Popover>
           <PopoverTrigger asChild>
